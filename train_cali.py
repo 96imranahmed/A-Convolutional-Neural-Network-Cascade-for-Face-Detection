@@ -80,19 +80,20 @@ h_conv1_48 = tf.nn.relu(etc.conv2d(x_48_reshaped, W_conv1_48_cali) + b_conv1_48_
 h_pool1_48 = etc.max_pool_3x3(h_conv1_48)
 
 #normalization layer 1
+norm_1 = tf.nn.local_response_normalization(h_pool1_48,depth_radius=9)
 
 #conv layer 2
 W_conv2_48_cali = etc.weight_variable([5,5,64,64],'calib_wc2_48')
 b_conv2_48_cali = etc.bias_variable([64],'calib_bc2_48')
-h_conv2_48 = tf.nn.relu(etc.conv2d(h_pool1_48, W_conv2_48_cali) + b_conv2_48_cali)
+h_conv2_48 = tf.nn.relu(etc.conv2d(norm_1, W_conv2_48_cali) + b_conv2_48_cali)
 
 #normalization layer 2
-
+norm_2 = tf.nn.local_response_normalization(h_conv2_48, depth_radius=9)
 
 #fully layer 1
 W_fc1_48_cali = etc.weight_variable([24 * 24 * 64, 256],'calib_wfc1_48')
 b_fc1_48_cali = etc.bias_variable([256],'calib_bfc1_48')
-h_conv2_48_reshaped = tf.reshape(h_conv2_48, [-1, 24 * 24 * 64])
+h_conv2_48_reshaped = tf.reshape(norm_2, [-1, 24 * 24 * 64])
 h_fc1_48 = tf.nn.relu(tf.matmul(h_conv2_48_reshaped, W_fc1_48_cali) + b_fc1_48_cali)
 
 #fully layer 2

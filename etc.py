@@ -10,7 +10,7 @@ db_data_limit = 2500
 db_neg_data_limit = 2000
 
 #dir
-raw_dir = "/home/imran/Desktop/convnet/"
+raw_dir = "/home/imran/Desktop/CascadeCNN/"
 db_dir = raw_dir + "data/"
 save_dir = raw_dir + "var_save/"
 test_dir = raw_dir + "test/"
