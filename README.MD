@@ -4,7 +4,9 @@ http://www.cv-foundation.org/openaccess/content_cvpr_2015/papers/Li_A_Convolutio
 
 implemented with TensorFlow and yields similar result with paper
 
-used AFLW dataset for training and  FDDB dataset for testing
+Original fork (see commits) used AFLW dataset for training and  FDDB dataset for testing
+
+This fork uses HollywoodHeads dataset for training (and COCOdb non-persons for negatives)
 
 ##Result(gren: GT, blue: detected face)
 ![face](https://cloud.githubusercontent.com/assets/13601723/15349050/a8192776-1d0a-11e6-86be-243175c22ba4.png)
