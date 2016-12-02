@@ -10,10 +10,11 @@ db_data_limit = 2500
 db_neg_data_limit = 2000
 
 #dir
-db_dir = "/home/imran/Desktop/convnet/data/"
-save_dir = db_dir + "var_save/"
-test_dir = db_dir + "test/"
-result_dir = db_dir + "result/"
+raw_dir = "/home/imran/Desktop/convnet/"
+db_dir = raw_dir + "data/"
+save_dir = raw_dir + "var_save/"
+test_dir = raw_dir + "test/"
+result_dir = raw_dir + "result/"
 
 #db parameters
 input_channel = 3
