@@ -103,15 +103,18 @@ h_fc2_48 = tf.nn.softmax(tf.matmul(h_fc1_48, W_fc2_48_cali) + b_fc2_48_cali)
 
 
 loss_12 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_12 + 1e-9),1))
-train_step_12 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_12)    
+# train_step_12 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_12)  7
+train_step_12 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_12)
 accuracy_12 = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(h_fc2_12,1), tf.argmax(y_target,1)), "float"))
 
 loss_24 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_24 + 1e-9),1))
-train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)    
+# train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)
+train_step_24 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_24)
 accuracy_24 = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(h_fc2_24,1), tf.argmax(y_target,1)), "float"))
 
 loss_48 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_48 + 1e-9),1))
-train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)    
+#train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)
+train_step_48 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_48)
 accuracy_48 = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(h_fc2_48,1), tf.argmax(y_target,1)), "float"))
 
 sess.run(tf.initialize_all_variables())
