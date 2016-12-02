@@ -5,11 +5,13 @@ import Image
 from skimage.util.shape import view_as_windows
 from skimage.transform import pyramid_gaussian
 
+#data_specifics
+db_data_limit = 2500
+db_neg_data_limit = 2000
+
 #dir
-db_dir = "/media/sda1/Study/Data/FDDB/"
+db_dir = "/home/imran/Desktop/convnet/data/"
 save_dir = db_dir + "var_save/"
-pos_dir = db_dir + "AFLW/aflw/data/flickr/"
-neg_dir = db_dir + "neg_train/"
 test_dir = db_dir + "test/"
 result_dir = db_dir + "result/"
 
@@ -61,7 +63,7 @@ cali_patt_num = len(cali_scale) * len(cali_off_x) * len(cali_off_y)
 cali_thr = 0.5
 
 def img2array(img,dim):
-     
+    # print(np.shape(img), img.size)
     if dim == img_size_12:    
         if img.size[0] != img_size_12 or img.size[1] != img_size_12:
             img = img.resize((img_size_12,img_size_12))

@@ -15,7 +15,7 @@ import load_db
 
 
 
-train_db = load_db.load_db_cali_train()
+train_db = load_db.load_db_cali_head_train()
 
 sess = tf.InteractiveSession()
 
