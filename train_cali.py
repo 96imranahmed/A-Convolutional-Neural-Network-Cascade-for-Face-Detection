@@ -80,7 +80,7 @@ h_conv1_48 = tf.nn.relu(etc.conv2d(x_48_reshaped, W_conv1_48_cali) + b_conv1_48_
 h_pool1_48 = etc.max_pool_3x3(h_conv1_48)
 
 #normalization layer 1
-norm_1 = tf.nn.local_response_normalization(h_pool1_48,depth_radius=9)
+norm_1 = tf.nn.local_response_normalization(h_pool1_48,depth_radius=7)
 
 #conv layer 2
 W_conv2_48_cali = etc.weight_variable([5,5,64,64],'calib_wc2_48')
@@ -88,7 +88,7 @@ b_conv2_48_cali = etc.bias_variable([64],'calib_bc2_48')
 h_conv2_48 = tf.nn.relu(etc.conv2d(norm_1, W_conv2_48_cali) + b_conv2_48_cali)
 
 #normalization layer 2
-norm_2 = tf.nn.local_response_normalization(h_conv2_48, depth_radius=9)
+norm_2 = tf.nn.local_response_normalization(h_conv2_48, depth_radius=7)
 
 #fully layer 1
 W_fc1_48_cali = etc.weight_variable([24 * 24 * 64, 256],'calib_wfc1_48')
@@ -103,8 +103,8 @@ h_fc2_48 = tf.nn.softmax(tf.matmul(h_fc1_48, W_fc2_48_cali) + b_fc2_48_cali)
 
 
 loss_12 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_12 + 1e-9),1))
-# train_step_12 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_12)  7
-train_step_12 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_12)
+train_step_12 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_12)
+# train_step_12 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_12)
 accuracy_12 = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(h_fc2_12,1), tf.argmax(y_target,1)), "float"))
 
 loss_24 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_24 + 1e-9),1))
@@ -136,7 +136,9 @@ acc_lb = np.zeros((etc.acc_bench_num,etc.cali_patt_num),np.float32)
 for k in tf.all_variables():
     print k.name
 
-for cascade_lv in xrange(etc.cascade_level):
+do_cascade = [0]
+
+for cascade_lv in do_cascade: #xrange(etc.cascade_level):
 
     print "Training start!"
     train_start = time.time()

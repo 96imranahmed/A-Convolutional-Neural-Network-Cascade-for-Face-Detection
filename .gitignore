@@ -1,4 +1,6 @@
 data/*
+*.save
+var_save/*
 
 # Video/Audio Files #
 #####################

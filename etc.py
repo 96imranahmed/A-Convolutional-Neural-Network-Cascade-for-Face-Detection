@@ -6,7 +6,7 @@ from skimage.util.shape import view_as_windows
 from skimage.transform import pyramid_gaussian
 
 #data_specifics
-db_data_limit = 2500
+db_data_limit = 3000
 db_neg_data_limit = 2000
 
 #dir
@@ -31,9 +31,9 @@ dim_48 = img_size_48 * img_size_48 * input_channel
 b_intial = 0.0
 w_stddev = 0.1
 lr = 5e-2
-epsilon = 1e-4
+epsilon = 0.1
 epoch_num = [100,100,100]
-epoch_calib_num = [75,75,75]
+epoch_calib_num = [150,75,75]
 pos_batch = 50
 neg_batch = 50
 mini_batch = 100
