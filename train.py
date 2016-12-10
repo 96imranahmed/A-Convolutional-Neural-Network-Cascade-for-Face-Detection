@@ -87,16 +87,18 @@ h_conv1_48 = tf.nn.relu(etc.conv2d(x_48_reshaped, W_conv1_48) + b_conv1_48)
 h_pool1_48 = etc.max_pool_3x3(h_conv1_48)
 
 #normalization layer 1
+norm_1 = tf.nn.local_response_normalization(h_pool1_48,depth_radius=7)
 
 #conv layer 2
 W_conv2_48 = etc.weight_variable([5,5,64,64])
 b_conv2_48 = etc.bias_variable([64])
-h_conv2_48 = tf.nn.relu(etc.conv2d(h_pool1_48, W_conv2_48) + b_conv2_48)
+h_conv2_48 = tf.nn.relu(etc.conv2d(norm_1, W_conv2_48) + b_conv2_48)
 
 #normalization layer 2
+norm_2 = tf.nn.local_response_normalization(h_conv2_48, depth_radius=7)
 
 #pooling layer 2
-h_pool2_48 = etc.max_pool_3x3(h_conv2_48)
+h_pool2_48 = etc.max_pool_3x3(norm_2)
 
 #fully layer 1
 W_fc1_48 = etc.weight_variable([12 * 12 * 64, 256])
@@ -119,13 +121,15 @@ recall_12 = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(thresholding_12, tf.co
 accuracy_12 = tf.reduce_mean(tf.cast(tf.equal(thresholding_12, y_target), "float"))
 
 loss_24 = tf.reduce_mean(tf.div(tf.add(-tf.reduce_sum(y_target * tf.log(h_fc2_24 + 1e-9),1), -tf.reduce_sum((1-y_target) * tf.log(1-h_fc2_24 + 1e-9),1)),2))
-train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)    
+#train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)    
+train_step_24 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_24)
 thresholding_24 = tf.cast(tf.greater(h_fc2_24, thr), "float")
 recall_24 = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(thresholding_24, tf.constant([1.0])), tf.equal(y_target, tf.constant([1.0]))), "float")) / tf.reduce_sum(y_target)
 accuracy_24 = tf.reduce_mean(tf.cast(tf.equal(thresholding_24, y_target), "float"))
 
 loss_48 = tf.reduce_mean(tf.div(tf.add(-tf.reduce_sum(y_target * tf.log(h_fc2_48 + 1e-9),1), -tf.reduce_sum((1-y_target) * tf.log(1-h_fc2_48 + 1e-9),1)),2))
-train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)    
+#train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)    
+train_step_48 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_48)
 thresholding_48 = tf.cast(tf.greater(h_fc2_48, thr), "float")
 recall_48 = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(thresholding_48, tf.constant([1.0])), tf.equal(y_target, tf.constant([1.0]))), "float")) / tf.reduce_sum(y_target)
 accuracy_48 = tf.reduce_mean(tf.cast(tf.equal(thresholding_48, y_target), "float"))
@@ -190,8 +194,8 @@ db_48 = np.zeros((etc.mini_batch,etc.dim_48), np.float32)
 lb = np.zeros((etc.mini_batch, 1), np.float32)
 
 start = False
-
-for cascade_lv in xrange(1,etc.cascade_level):
+do_cascade = [2,3]  
+for cascade_lv in do_cascade:
     if start:
         start = False
         cascade_lv = 1
@@ -309,7 +313,7 @@ for cascade_lv in xrange(1,etc.cascade_level):
     print "Training start!"
     train_start = time.time()
     fp_loss = open("./result/loss_" + str(cascade_lv) + "_.txt", "w")
-        
+  
     for e in xrange(etc.epoch_num[cascade_lv]):
         
         fp_conf_mat = open("./result/conf_mat_" + str(e) + "_.txt","w")  
