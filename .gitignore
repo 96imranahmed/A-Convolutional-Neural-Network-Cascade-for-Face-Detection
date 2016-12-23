@@ -7,6 +7,7 @@ var_save/*
 *.mp4
 *.avi
 *.mp3
+*.jpg
 
 # Logs and databases #
 ######################

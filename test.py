@@ -229,8 +229,13 @@ correct_count = np.zeros((etc.thr_num),np.int32)
 for tid,img_dir in enumerate(test_img):
     
     print tid, "/", img_num,  "th image is in testing..." 
-    
-    img = Image.open(etc.db_dir + img_dir + ".jpg")
+    img = None
+    try:
+        img = Image.open(etc.db_dir + img_dir + ".jpg")
+    except IOError as error:
+        print('Skipping, image not found')
+        continue
+
     if len(np.shape(np.asarray(img))) < 3:
         arr = np.asarray(img)
         img = np.zeros((img.size[1],img.size[0],etc.input_channel),np.uint8)

@@ -6,8 +6,8 @@ from skimage.util.shape import view_as_windows
 from skimage.transform import pyramid_gaussian
 
 #data_specifics
-db_data_limit = 30000 #3000
-db_neg_data_limit = 100 #2000
+db_data_limit = 30000 #30000 #3000
+db_neg_data_limit = 80 #100,2000
 
 #dir
 raw_dir = "/home/imran/Desktop/CascadeCNN/"

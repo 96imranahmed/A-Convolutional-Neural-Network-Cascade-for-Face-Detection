@@ -187,6 +187,7 @@ sess.run(tf.initialize_all_variables())
 
 thr_12 = 5e-3
 thr_24 = 1e-9
+thr_48 = 1e-9
 
 db_12 = np.zeros((etc.mini_batch,etc.dim_12), np.float32)
 db_24 = np.zeros((etc.mini_batch,etc.dim_24), np.float32)
@@ -194,12 +195,16 @@ db_48 = np.zeros((etc.mini_batch,etc.dim_48), np.float32)
 lb = np.zeros((etc.mini_batch, 1), np.float32)
 
 start = False
-do_cascade = [2,3]  
+do_cascade = [1,2] #0-Cascade_1,1-Cascade_2,2-Cascade_3  
 for cascade_lv in do_cascade:
     if start:
         start = False
         cascade_lv = 1
-    
+    jump_back = False
+    if cascade_lv == 2:
+        jump_back = True
+        cascade_lv = 1
+
     if (cascade_lv > 0):
         print "Negative sample mining"
         neg_db = [0 for _ in xrange(len(neg_img))]
@@ -240,7 +245,7 @@ for cascade_lv in do_cascade:
                 result_box = final_box
                 final_box = []                     
 
-                if cascade_lv == 1 and len(result_box) > 0:
+                if (cascade_lv == 1) and len(result_box) > 0:
                     #24-net
                     test_db_12 = np.zeros((len(result_box),etc.dim_12),np.float32)
                     test_db_24 = np.zeros((len(result_box),etc.dim_24),np.float32)
@@ -304,13 +309,15 @@ for cascade_lv in do_cascade:
                 elif cascade_lv == 1:
                     neg_db[nid] = [result_box[i][5].resize((etc.img_size_48,etc.img_size_48)) for i in xrange(len(result_box))]
 
-    
         neg_db = [elem for elem in neg_db if type(elem) != int]
         neg_db = flatten(neg_db)
 
         print "neg_db size: ", len(neg_db)
 
-    print "Training start!"
+    if jump_back == True:
+        cascade_lv = 2
+
+    print "Training start!: " + str(cascade_lv)
     train_start = time.time()
     fp_loss = open("./result/loss_" + str(cascade_lv) + "_.txt", "w")
   
