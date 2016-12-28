@@ -2,12 +2,13 @@ import math
 import tensorflow as tf
 import numpy as np
 import Image
+import os
 from skimage.util.shape import view_as_windows
 from skimage.transform import pyramid_gaussian
 
 #data_specifics
-db_data_limit = 30000 #30000 #3000
-db_neg_data_limit = 80 #100,2000
+db_data_limit = 4500
+db_neg_data_limit = 10000
 
 #dir
 raw_dir = "/home/imran/Desktop/CascadeCNN/"
@@ -33,7 +34,7 @@ w_stddev = 0.1
 lr = 5e-2
 epsilon = 0.1
 epoch_num = [100,100,100]
-epoch_calib_num = [150,75,75]
+epoch_calib_num = [50, 50, 50]
 pos_batch = 50
 neg_batch = 50
 mini_batch = 100

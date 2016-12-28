@@ -87,18 +87,16 @@ h_conv1_48 = tf.nn.relu(etc.conv2d(x_48_reshaped, W_conv1_48) + b_conv1_48)
 h_pool1_48 = etc.max_pool_3x3(h_conv1_48)
 
 #normalization layer 1
-norm_1 = tf.nn.local_response_normalization(h_pool1_48,depth_radius=7)
 
 #conv layer 2
 W_conv2_48 = etc.weight_variable([5,5,64,64])
 b_conv2_48 = etc.bias_variable([64])
-h_conv2_48 = tf.nn.relu(etc.conv2d(norm_1, W_conv2_48) + b_conv2_48)
+h_conv2_48 = tf.nn.relu(etc.conv2d(h_pool1_48, W_conv2_48) + b_conv2_48)
 
 #normalization layer 2
-norm_2 = tf.nn.local_response_normalization(h_conv2_48, depth_radius=7)
 
 #pooling layer 2
-h_pool2_48 = etc.max_pool_3x3(norm_2)
+h_pool2_48 = etc.max_pool_3x3(h_conv2_48)
 
 #fully layer 1
 W_fc1_48 = etc.weight_variable([12 * 12 * 64, 256])
@@ -121,15 +119,13 @@ recall_12 = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(thresholding_12, tf.co
 accuracy_12 = tf.reduce_mean(tf.cast(tf.equal(thresholding_12, y_target), "float"))
 
 loss_24 = tf.reduce_mean(tf.div(tf.add(-tf.reduce_sum(y_target * tf.log(h_fc2_24 + 1e-9),1), -tf.reduce_sum((1-y_target) * tf.log(1-h_fc2_24 + 1e-9),1)),2))
-#train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)    
-train_step_24 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_24)
+train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)    
 thresholding_24 = tf.cast(tf.greater(h_fc2_24, thr), "float")
 recall_24 = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(thresholding_24, tf.constant([1.0])), tf.equal(y_target, tf.constant([1.0]))), "float")) / tf.reduce_sum(y_target)
 accuracy_24 = tf.reduce_mean(tf.cast(tf.equal(thresholding_24, y_target), "float"))
 
 loss_48 = tf.reduce_mean(tf.div(tf.add(-tf.reduce_sum(y_target * tf.log(h_fc2_48 + 1e-9),1), -tf.reduce_sum((1-y_target) * tf.log(1-h_fc2_48 + 1e-9),1)),2))
-#train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)    
-train_step_48 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_48)
+train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)    
 thresholding_48 = tf.cast(tf.greater(h_fc2_48, thr), "float")
 recall_48 = tf.reduce_sum(tf.cast(tf.logical_and(tf.equal(thresholding_48, tf.constant([1.0])), tf.equal(y_target, tf.constant([1.0]))), "float")) / tf.reduce_sum(y_target)
 accuracy_48 = tf.reduce_mean(tf.cast(tf.equal(thresholding_48, y_target), "float"))
@@ -187,140 +183,19 @@ sess.run(tf.initialize_all_variables())
 
 thr_12 = 5e-3
 thr_24 = 1e-9
-thr_48 = 1e-9
 
 db_12 = np.zeros((etc.mini_batch,etc.dim_12), np.float32)
 db_24 = np.zeros((etc.mini_batch,etc.dim_24), np.float32)
 db_48 = np.zeros((etc.mini_batch,etc.dim_48), np.float32)
 lb = np.zeros((etc.mini_batch, 1), np.float32)
 
-start = False
-do_cascade = [1,2] #0-Cascade_1,1-Cascade_2,2-Cascade_3  
-for cascade_lv in do_cascade:
-    if start:
-        start = False
-        cascade_lv = 1
-    jump_back = False
-    if cascade_lv == 2:
-        jump_back = True
-        cascade_lv = 1
 
-    if (cascade_lv > 0):
-        print "Negative sample mining"
-        neg_db = [0 for _ in xrange(len(neg_img))]
-        neg_db_num = 0 
-        for nid, img in enumerate(neg_img):
-            print "cas_lv ", cascade_lv, " ", nid+1,"/",len(neg_img), "th image...", "neg_db size: ", neg_db_num, "thr_12: ", thr_12, "thr_24: ", thr_24
-            
-            #12-net
-            result_box = etc.slidingW_Test(img,thr_12,x_12,h_fc2_12)
+for cascade_lv in xrange(0,etc.cascade_level):
 
-
-            #12-calib
-            if len(result_box) > 0:
-                neg_db_tmp = np.zeros((len(result_box),etc.dim_12),np.float32)
-                for id_,box in enumerate(result_box):
-                    resized_img = etc.img2array(box[5],etc.img_size_12)
-                    neg_db_tmp[id_,:] = resized_img
-
-                result = h_fc2_12_cali.eval(feed_dict={x_12_cali: neg_db_tmp})
-                result_box = etc.calib_run(result_box,result,img) 
-                    
-
-                #NMS for each scale
-                scale_cur = 0
-                scale_box = []
-                final_box = []
-                for id_,box in enumerate(result_box):
-                    if box[6] == scale_cur:
-                        scale_box.append(box)
-                    if box[6] != scale_cur or id_ == len(result_box)-1:
-                        scale_box.sort(key=lambda x :x[4])
-                        scale_box.reverse()
-                        supp_box_id = etc.NMS_fast(scale_box)
-                        final_box += [scale_box[i] for i in supp_box_id]
-                        scale_cur += 1
-                        scale_box = [box]
-
-                result_box = final_box
-                final_box = []                     
-
-                if (cascade_lv == 1) and len(result_box) > 0:
-                    #24-net
-                    test_db_12 = np.zeros((len(result_box),etc.dim_12),np.float32)
-                    test_db_24 = np.zeros((len(result_box),etc.dim_24),np.float32)
-                    for id_,box in enumerate(result_box):
-                        original_patch = box[5]
-                        resized_img_12 = etc.img2array(original_patch,etc.img_size_12)
-                        resized_img_24 = etc.img2array(original_patch,etc.img_size_24)
-                        
-                        test_db_12[id_,:] = resized_img_12
-                        test_db_24[id_,:] = resized_img_24
-                    
-
-                    final_box = []
-                    test_db = np.empty((0,etc.dim_24),np.float32)
-                    for tit in xrange(len(test_db_12)/etc.test_bench_num+1):
-                        if tit == len(test_db_12)/etc.test_bench_num:
-                            test_12 = test_db_12[tit*etc.test_bench_num:,:]
-                            test_24 = test_db_24[tit*etc.test_bench_num:,:]
-                            box_tmp = result_box[tit*etc.test_bench_num:]
-                        else:
-                            test_12 = test_db_12[tit*etc.test_bench_num:(tit+1)*etc.test_bench_num,:]
-                            test_24 = test_db_24[tit*etc.test_bench_num:(tit+1)*etc.test_bench_num,:]
-                            box_tmp = result_box[tit*etc.test_bench_num:(tit+1)*etc.test_bench_num]
-                        
-                        FROM_12 = h_fc1_12.eval(feed_dict={x_12:test_12})
-                        result = h_fc2_24.eval(feed_dict={from_12: FROM_12, x_24: test_24})
-                        result_id = np.where(result > thr_24)[0]
-                        test_db = np.append(test_db,test_24[result_id,:],axis=0)
-                        final_box += [box_tmp[i] for i in result_id]
-                    result_box = final_box
-                    final_box = []
-                    
-                    if len(result_box) > 0:
-                        #24-net_calib
-                        test_db_24 = test_db
-                        result = h_fc2_24_cali.eval(feed_dict={x_24_cali: test_db_24})
-                        result_box = etc.calib_run(result_box,result,img)
-                        
-                        #NMS for each scale
-                        scale_cur = 0
-                        scale_box = []
-                        final_box = []
-                        for id_,box in enumerate(result_box):
-                            if box[6] == scale_cur:
-                                scale_box.append(box)
-                            if box[6] != scale_cur or id_ == len(result_box)-1:
-                                scale_box.sort(key=lambda x :x[4])
-                                scale_box.reverse()
-                                supp_box_id = etc.NMS_fast(scale_box)
-                                final_box += [scale_box[i] for i in supp_box_id]
-                                scale_cur += 1
-                                scale_box = [box]
-
-                        result_box = final_box
-                        final_box = []                     
-
-            if len(result_box)>0:
-                neg_db_num += len(result_box)
-                if cascade_lv == 0:
-                    neg_db[nid] = [result_box[i][5].resize((etc.img_size_24,etc.img_size_24)) for i in xrange(len(result_box))]
-                elif cascade_lv == 1:
-                    neg_db[nid] = [result_box[i][5].resize((etc.img_size_48,etc.img_size_48)) for i in xrange(len(result_box))]
-
-        neg_db = [elem for elem in neg_db if type(elem) != int]
-        neg_db = flatten(neg_db)
-
-        print "neg_db size: ", len(neg_db)
-
-    if jump_back == True:
-        cascade_lv = 2
-
-    print "Training start!: " + str(cascade_lv)
+    print "Training start!"
     train_start = time.time()
     fp_loss = open("./result/loss_" + str(cascade_lv) + "_.txt", "w")
-  
+        
     for e in xrange(etc.epoch_num[cascade_lv]):
         
         fp_conf_mat = open("./result/conf_mat_" + str(e) + "_.txt","w")  
@@ -328,8 +203,10 @@ for cascade_lv in do_cascade:
         average_loss = 0
         
         for b_iter in xrange(etc.batch_iter):
+
             pos_id = random.sample(xrange(len(pos_db)),etc.pos_batch)
             neg_id = random.sample(xrange(len(neg_db)),etc.neg_batch)
+    
             if cascade_lv == 0:
                 db_12[:etc.pos_batch,:] = pos_db[pos_id,:etc.dim_12]
                 db_12[etc.pos_batch:,:] = neg_db[neg_id,:etc.dim_12]
@@ -346,8 +223,7 @@ for cascade_lv in do_cascade:
             elif cascade_lv == 1:
                 db_12[:etc.pos_batch,:] = pos_db[pos_id,:etc.dim_12]
                 db_24[:etc.pos_batch,:] = pos_db[pos_id,etc.dim_12:etc.dim_12+etc.dim_24]
-
-                for eid,id_ in enumerate(neg_id): 
+                for eid,id_ in enumerate(neg_id):
                     neg_12 = etc.img2array(neg_db[id_],etc.img_size_12)
                     neg_24 = etc.img2array(neg_db[id_],etc.img_size_24)
                     db_12[etc.pos_batch+eid,:] = neg_12
@@ -370,7 +246,6 @@ for cascade_lv in do_cascade:
                 db_12[:etc.pos_batch,:] = pos_db[pos_id,:etc.dim_12]
                 db_24[:etc.pos_batch,:] = pos_db[pos_id,etc.dim_12:etc.dim_12+etc.dim_24]
                 db_48[:etc.pos_batch,:] = pos_db[pos_id,etc.dim_12+etc.dim_24:]
-
                 for eid,id_ in enumerate(neg_id):
                     neg_12 = etc.img2array(neg_db[id_],etc.img_size_12)
                     neg_24 = etc.img2array(neg_db[id_],etc.img_size_24)
@@ -406,7 +281,8 @@ for cascade_lv in do_cascade:
 
         #test each epoch
         pos_id = random.sample(xrange(len(pos_db)),etc.acc_bench_num)
-        neg_id = random.sample(xrange(len(neg_db)),etc.acc_bench_num)  
+        neg_id = random.sample(xrange(len(neg_db)),etc.acc_bench_num)
+
         if cascade_lv == 0:
             X_12 = np.append(pos_db[pos_id,:etc.dim_12], neg_db[neg_id,:etc.dim_12], axis = 0)
             Y = np.reshape(np.append(np.ones((etc.acc_bench_num),np.float32), np.zeros((etc.acc_bench_num),np.float32), axis = 0), (np.shape(X_12)[0],1))
@@ -417,7 +293,6 @@ for cascade_lv in do_cascade:
         elif cascade_lv == 1:
             neg_acc_12 = np.zeros((etc.acc_bench_num,etc.dim_12),np.float32)
             neg_acc_24 = np.zeros((etc.acc_bench_num,etc.dim_24),np.float32)
-
             for eid,id_ in enumerate(neg_id):
                     neg_12 = etc.img2array(neg_db[id_],etc.img_size_12)
                     neg_24 = etc.img2array(neg_db[id_],etc.img_size_24)
@@ -436,7 +311,6 @@ for cascade_lv in do_cascade:
             neg_acc_12 = np.zeros((etc.acc_bench_num,etc.dim_12),np.float32)
             neg_acc_24 = np.zeros((etc.acc_bench_num,etc.dim_24),np.float32)
             neg_acc_48 = np.zeros((etc.acc_bench_num,etc.dim_48),np.float32)
-
             for eid,id_ in enumerate(neg_id):
                     neg_12 = etc.img2array(neg_db[id_],etc.img_size_12)
                     neg_24 = etc.img2array(neg_db[id_],etc.img_size_24)
@@ -463,11 +337,11 @@ for cascade_lv in do_cascade:
         print "Loss: ", average_loss
 
         fp_loss.write(str(average_loss)+"\n")
-        
+    
         
         train_finish = time.time()
         print train_finish - train_start, "secs for training"
-        
+        fp_loss.close()
         
         saver = tf.train.Saver()
         if cascade_lv == 0:
@@ -476,24 +350,20 @@ for cascade_lv in do_cascade:
             saver.save(sess, etc.save_dir + "24-net.ckpt")
         else:
             saver.save(sess, etc.save_dir + "48-net.ckpt")
-
-    fp_loss.close()   
+        
     saver_detect = tf.train.Saver({"Variable":W_conv1_12, "Variable_1":b_conv1_12, "Variable_2":W_fc1_12, "Variable_3":b_fc1_12, "Variable_4":W_fc2_12, "Variable_5":b_fc2_12, "Variable_6": W_conv1_24, "Variable_7":b_conv1_24, "Variable_8":W_fc1_24, "Variable_9":b_fc1_24, "Variable_10":W_fc2_24, "Variable_11":b_fc2_24, "Variable_12":W_conv1_48, "Variable_13":b_conv1_48, "Variable_14":W_conv2_48, "Variable_15":b_conv2_48, "Variable_16":W_fc1_48, "Variable_17":b_fc1_48, "Variable_18":W_fc2_48,"Variable_19":b_fc2_48})
-    if cascade_lv == 0:
-        saver_detect.save(sess,etc.save_dir+"12-net.ckpt")
-    elif cascade_lv == 1:
-        saver_detect.save(sess,etc.save_dir+"24-net.ckpt")
+    
     saver_calib_12 = tf.train.Saver({"calib_wc1_12":W_conv1_12_cali, "calib_bc1_12":b_conv1_12_cali, "calib_wfc1_12":W_fc1_12_cali, "calib_bfc1_12":b_fc1_12_cali, "calib_wfc2_12":W_fc2_12_cali, "calib_bfc2_12":b_fc2_12_cali})
-    #saver_calib_12.save(sess,etc.save_dir+"12-net_calib.ckpt")
+    
     saver_calib_24 = tf.train.Saver({"calib_wc1_24": W_conv1_24_cali, "calib_bc1_24":b_conv1_24_cali, "calib_wfc1_24":W_fc1_24_cali, "calib_bfc1_24":b_fc1_24_cali, "calib_wfc2_24":W_fc2_24_cali, "calib_bfc2_24":b_fc2_24_cali})
-    # saver_calib_24.save(sess,etc.save_dir+"24-net_calib.ckpt")
+ 
     if cascade_lv == 0:
         saver_detect.restore(sess,etc.save_dir+"12-net.ckpt")
     elif cascade_lv == 1:
         saver_detect.restore(sess,etc.save_dir+"24-net.ckpt")
 
-    # saver_calib_12.restore(sess,etc.save_dir+"12-net_calib.ckpt")
-    # saver_calib_24.restore(sess,etc.save_dir+"24-net_calib.ckpt")
+    saver_calib_12.restore(sess,etc.save_dir+"12-net_calib.ckpt")
+    saver_calib_24.restore(sess,etc.save_dir+"24-net_calib.ckpt")
 
    
     if cascade_lv == 2:
@@ -501,3 +371,111 @@ for cascade_lv in do_cascade:
         break
 
        
+    print "Negative sample mining"
+    neg_db = [0 for _ in xrange(len(neg_img))]
+    neg_db_num = 0 
+    for nid, img in enumerate(neg_img):
+        print "cas_lv ", cascade_lv, " ", nid+1,"/",len(neg_img), "th image...", "neg_db size: ", neg_db_num, "thr_12: ", thr_12, "thr_24: ", thr_24
+        
+        #12-net
+        result_box = etc.slidingW_Test(img,thr_12,x_12,h_fc2_12)
+
+
+        #12-calib
+        if len(result_box) > 0:
+            neg_db_tmp = np.zeros((len(result_box),etc.dim_12),np.float32)
+            for id_,box in enumerate(result_box):
+                resized_img = etc.img2array(box[5],etc.img_size_12)
+                neg_db_tmp[id_,:] = resized_img
+
+            result = h_fc2_12_cali.eval(feed_dict={x_12_cali: neg_db_tmp})
+            result_box = etc.calib_run(result_box,result,img) 
+                
+
+            #NMS for each scale
+            scale_cur = 0
+            scale_box = []
+            final_box = []
+            for id_,box in enumerate(result_box):
+                if box[6] == scale_cur:
+                    scale_box.append(box)
+                if box[6] != scale_cur or id_ == len(result_box)-1:
+                    scale_box.sort(key=lambda x :x[4])
+                    scale_box.reverse()
+                    supp_box_id = etc.NMS(scale_box)
+                    final_box += [scale_box[i] for i in supp_box_id]
+                    scale_cur += 1
+                    scale_box = [box]
+
+            result_box = final_box
+            final_box = []                     
+
+            if cascade_lv == 1 and len(result_box) > 0:
+                #24-net
+                test_db_12 = np.zeros((len(result_box),etc.dim_12),np.float32)
+                test_db_24 = np.zeros((len(result_box),etc.dim_24),np.float32)
+                for id_,box in enumerate(result_box):
+                    original_patch = box[5]
+                    resized_img_12 = etc.img2array(original_patch,etc.img_size_12)
+                    resized_img_24 = etc.img2array(original_patch,etc.img_size_24)
+                    
+                    test_db_12[id_,:] = resized_img_12
+                    test_db_24[id_,:] = resized_img_24
+                
+
+                final_box = []
+                test_db = np.empty((0,etc.dim_24),np.float32)
+                for tit in xrange(len(test_db_12)/etc.test_bench_num+1):
+                    if tit == len(test_db_12)/etc.test_bench_num:
+                        test_12 = test_db_12[tit*etc.test_bench_num:,:]
+                        test_24 = test_db_24[tit*etc.test_bench_num:,:]
+                        box_tmp = result_box[tit*etc.test_bench_num:]
+                    else:
+                        test_12 = test_db_12[tit*etc.test_bench_num:(tit+1)*etc.test_bench_num,:]
+                        test_24 = test_db_24[tit*etc.test_bench_num:(tit+1)*etc.test_bench_num,:]
+                        box_tmp = result_box[tit*etc.test_bench_num:(tit+1)*etc.test_bench_num]
+                    
+                    FROM_12 = h_fc1_12.eval(feed_dict={x_12:test_12})
+                    result = h_fc2_24.eval(feed_dict={from_12: FROM_12, x_24: test_24})
+                    result_id = np.where(result > thr_24)[0]
+                    test_db = np.append(test_db,test_24[result_id,:],axis=0)
+                    final_box += [box_tmp[i] for i in result_id]
+                result_box = final_box
+                final_box = []
+                
+                if len(result_box) > 0:
+                    #24-net_calib
+                    test_db_24 = test_db
+                    result = h_fc2_24_cali.eval(feed_dict={x_24_cali: test_db_24})
+                    result_box = etc.calib_run(result_box,result,img)
+                    
+                    #NMS for each scale
+                    scale_cur = 0
+                    scale_box = []
+                    final_box = []
+                    for id_,box in enumerate(result_box):
+                        if box[6] == scale_cur:
+                            scale_box.append(box)
+                        if box[6] != scale_cur or id_ == len(result_box)-1:
+                            scale_box.sort(key=lambda x :x[4])
+                            scale_box.reverse()
+                            supp_box_id = etc.NMS(scale_box)
+                            final_box += [scale_box[i] for i in supp_box_id]
+                            scale_cur += 1
+                            scale_box = [box]
+
+                    result_box = final_box
+                    final_box = []                     
+
+        if len(result_box)>0:
+            neg_db_num += len(result_box)
+            if cascade_lv == 0:
+                neg_db[nid] = [result_box[i][5].resize((etc.img_size_24,etc.img_size_24)) for i in xrange(len(result_box))]
+            elif cascade_lv == 1:
+                neg_db[nid] = [result_box[i][5].resize((etc.img_size_48,etc.img_size_48)) for i in xrange(len(result_box))]
+
+   
+    neg_db = [elem for elem in neg_db if type(elem) != int]
+    neg_db = flatten(neg_db)
+
+    print "neg_db size: ", len(neg_db)

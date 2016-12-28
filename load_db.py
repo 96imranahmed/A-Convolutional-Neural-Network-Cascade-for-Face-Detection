@@ -1,6 +1,7 @@
 import numpy as np
 import xml.etree.ElementTree as ET
 from PIL import Image
+from PIL import ImageDraw
 import math
 import time
 from random import randint
@@ -11,6 +12,7 @@ from compiler.ast import flatten
 from pycocotools.coco import COCO
 import etc
 import sys
+import pickle
 
 def load_db_test():
     
@@ -137,7 +139,7 @@ def dump_neg_imgs():
         if check_looped == False:
             break
 
-def load_db_head_train():
+def full_load_db_head_train():
     print('Loading negatives....')
     neg_no_person_dir = etc.db_dir + '/neg/'
     neg_count = 0
@@ -223,7 +225,7 @@ def load_db_head_train():
                 left = int(float(cur_objects[0]['xmin']))
                 right = int(float(cur_objects[0]['xmax']))
                 upper = int(float(cur_objects[0]['ymin']))
-                lower = int(float(cur_objects[0]['ymax']))    
+                lower = int(float(cur_objects[0]['ymax']))   
                 img = Image.open(img_dir+img_name)   
                 cropped_img = img.crop((left, upper, right, lower))
                 flipped_img = cropped_img.transpose(Image.FLIP_LEFT_RIGHT)
@@ -253,7 +255,7 @@ def load_db_head_train():
     
     return [pos_db, neg_db, neg_img]
 
-def load_db_cali_head_train():
+def full_load_db_cali_head_train():
     print "Loading HollywoodHeads training db..."
     cur_limit = etc.db_data_limit
     annot_dir = etc.db_dir + "HollywoodHeads/Annotations/"
@@ -293,13 +295,13 @@ def load_db_cali_head_train():
                 if len(cur_objects)==0:
                     #print('Skipping image, no boundary box or error in format')
                     continue
-                pos_db_line = np.zeros((2,etc.dim_12 + etc.dim_24 + etc.dim_48), np.float32)
                 left = int(float(cur_objects[0]['xmin']))
                 right = int(float(cur_objects[0]['xmax']))
                 upper = int(float(cur_objects[0]['ymin']))
-                lower = int(float(cur_objects[0]['ymax']))    
+                lower = int(float(cur_objects[0]['ymax'])) 
                 img = Image.open(img_dir+img_name)
-
+                # ImageDraw.Draw(img).rectangle((left, upper, right, lower), outline = "red")
+                # img.show()
                 if right >= img.size[0]:
                     right = img.size[0]-1
                 if lower >= img.size[1]:
@@ -510,8 +512,66 @@ def load_db_cali_train():
     
     return x_db
 
+def proc_positive_list(limit = 100000):
+    count = 0
+    annot_dir = etc.db_dir + "HollywoodHeads/Annotations/"
+    img_dir = etc.db_dir + "HollywoodHeads/JPEGImages/"
+    data_db = [0 for _ in xrange(limit)]
+    if os._exists(etc.db_dir + 'data_db.pickle'): os.remove(etc.db_dir + 'data_db.pickle')
+    for filename in os.listdir(annot_dir):
+        if count < limit:
+            if filename.endswith("xml"):
+                cur_file = os.path.join(annot_dir, filename)
+                cur_size = []
+                cur_objects = []
+                image = None
+                root = ET.parse(cur_file).getroot()
+                img_name = root.find('filename').text
+                size = root.find("size")
+                for elem in size.iter():
+                    cur_size.append(elem.text)
+                del cur_size[0]
+                if not cur_size[2] == '3':
+                    #print('Invalid image, skipping')
+                    continue   
+                for obj in root.findall('object'):
+                    bbox = obj.find('bndbox')
+                    if bbox is None:
+                        continue
+                    cur = {}
+                    for element in bbox.iter():
+                        if element.tag == "bndbox":
+                            pass
+                        else:
+                            cur[element.tag] = element.text
+                    cur_objects.append(cur)
+                if len(cur_objects) > 1:
+                    #print('Skipping image, >1 heads')
+                    continue
+                if len(cur_objects)==0:
+                    #print('Skipping image, no boundary box or error in format')
+                    continue
+                left = int(float(cur_objects[0]['xmin']))
+                right = int(float(cur_objects[0]['xmax']))
+                upper = int(float(cur_objects[0]['ymin']))
+                lower = int(float(cur_objects[0]['ymax']))
+                data_db[count] = tuple([img_name, left, upper, right, lower])
+                print("Processing: ", count)
+                count+=1
+    data_db = [elem for elem in data_db if type(elem) != int]
+    with open(etc.db_dir + 'data_db.pickle', 'wb') as handle:
+        pickle.dump(data_db, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    print('Proccessed array dumped to file')
+
+def load_positive_list():
+    with open(etc.db_dir + 'data_db.pickle', 'rb') as handle:
+        return pickle.load(handle)
+
 def main(argv):
-    dump_neg_imgs()
+    #dump_neg_imgs()
+    # proc_positive_list(limit = 150000)
+    # print(load_positive_list())
+    print('Loading databases')
 
 if __name__ == "__main__":
     main(sys.argv)

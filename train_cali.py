@@ -136,9 +136,7 @@ acc_lb = np.zeros((etc.acc_bench_num,etc.cali_patt_num),np.float32)
 for k in tf.all_variables():
     print k.name
 
-do_cascade = [0]
-
-for cascade_lv in do_cascade: #xrange(etc.cascade_level):
+for cascade_lv in xrange(0, etc.cascade_level):
 
     print "Training start!"
     train_start = time.time()
