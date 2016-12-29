@@ -7,7 +7,7 @@ from skimage.util.shape import view_as_windows
 from skimage.transform import pyramid_gaussian
 
 #data_specifics
-db_data_limit = 4500
+db_data_limit = 200
 db_neg_data_limit = 10000
 
 #dir

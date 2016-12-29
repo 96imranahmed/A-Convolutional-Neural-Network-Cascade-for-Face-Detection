@@ -4,7 +4,7 @@ from PIL import Image
 from PIL import ImageDraw
 import math
 import time
-from random import randint
+import random
 import os
 import shutil
 from skimage.transform import pyramid_gaussian
@@ -545,17 +545,17 @@ def proc_positive_list(limit = 100000):
                         else:
                             cur[element.tag] = element.text
                     cur_objects.append(cur)
-                if len(cur_objects) > 1:
-                    #print('Skipping image, >1 heads')
-                    continue
+                head_box = []
                 if len(cur_objects)==0:
-                    #print('Skipping image, no boundary box or error in format')
+                    print('Skipping image, no boundary box or error in format')
                     continue
-                left = int(float(cur_objects[0]['xmin']))
-                right = int(float(cur_objects[0]['xmax']))
-                upper = int(float(cur_objects[0]['ymin']))
-                lower = int(float(cur_objects[0]['ymax']))
-                data_db[count] = tuple([img_name, left, upper, right, lower])
+                for z in range(len(cur_objects)):
+                    left = int(float(cur_objects[z]['xmin']))
+                    right = int(float(cur_objects[z]['xmax']))
+                    upper = int(float(cur_objects[z]['ymin']))
+                    lower = int(float(cur_objects[z]['ymax']))
+                    head_box.append(tuple([left, upper, right, lower]))
+                data_db[count] = tuple([img_name, head_box])
                 print("Processing: ", count)
                 count+=1
     data_db = [elem for elem in data_db if type(elem) != int]
@@ -567,10 +567,71 @@ def load_positive_list():
     with open(etc.db_dir + 'data_db.pickle', 'rb') as handle:
         return pickle.load(handle)
 
+def generate_sample(db_in, batch):
+    cur_time = time.time()
+    img_dir = etc.db_dir + "HollywoodHeads/JPEGImages/"
+    db_out = [0 for _ in range(batch)]
+    for i in range(batch): #range(batch):
+        #print(i, time.time()-cur_time)
+        cur_time = time.time()
+        cur_img = random.choice(db_in)
+        img_name = cur_img[0]
+        head = random.choice(cur_img[1])
+        img = Image.open(img_dir+img_name)
+        left = head[0]
+        right = head[2]
+        upper = head[1]
+        lower = head[3]
+        if right >= img.size[0]:
+            right = img.size[0]-1
+        if lower >= img.size[1]:
+            lower = img.size[1]-1
+
+        si = random.randint(0, len(etc.cali_scale)-1)
+        s = etc.cali_scale[si]
+        xi = random.randint(0, len(etc.cali_off_x)-1)
+        x = etc.cali_off_x[xi]
+        yi = random.randint(0, len(etc.cali_off_y)-1)
+        y = etc.cali_off_y[yi]
+        new_left = left - x*float(right-left)/s
+        new_upper = upper - y*float(lower-upper)/s
+        new_right = new_left+float(right-left)/s
+        new_lower = new_upper+float(lower-upper)/s
+        
+        new_left = int(new_left)
+        new_upper = int(new_upper)
+        new_right = int(new_right)
+        new_lower = int(new_lower)
+
+        
+        if new_left < 0 or new_upper < 0 or new_right >= img.size[0] or new_lower >= img.size[1]:
+            continue
+
+        chk = time.time()
+        #cropped_img = Image.fromarray(np.array(img)[upper:lower, left:right])
+        cropped_img = img.crop((new_left, new_upper, new_right, new_lower))
+        #print(time.time()-chk)
+        calib_idx = si*len(etc.cali_off_x)*len(etc.cali_off_y)+xi*len(etc.cali_off_y)+yi
+        db_out[i] = [cropped_img,calib_idx]
+    db_out = [elem for elem in db_out if type(elem) != int]
+    return db_out
+
+def PIL2array(img):
+    return numpy.array(img.getdata(),
+                    numpy.uint8).reshape(img.size[1], img.size[0], 3)
+
+def array2PIL(arr, size):
+    mode = 'RGBA'
+    arr = arr.reshape(arr.shape[0]*arr.shape[1], arr.shape[2])
+    if len(arr[0]) == 3:
+        arr = numpy.c_[arr, 255*numpy.ones((len(arr),1), numpy.uint8)]
+    return Image.frombuffer(mode, size, arr.tostring(), 'raw', mode, 0, 1)
+
+
 def main(argv):
     #dump_neg_imgs()
-    # proc_positive_list(limit = 150000)
-    # print(load_positive_list())
+    proc_positive_list(limit = 200000)
+    db = load_positive_list()
     print('Loading databases')
 
 if __name__ == "__main__":
