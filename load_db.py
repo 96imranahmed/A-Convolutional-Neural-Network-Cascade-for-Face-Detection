@@ -340,8 +340,6 @@ def full_load_db_cali_head_train():
                     x_db[count] = x_db_list
                 count+=1
                 print('Processing training db: ', count-1, ' out of ', cur_limit)
-        else:
-            break
 
     x_db = [elem for elem in x_db if type(elem) != int]    
     x_db = [x_db[i][j] for i in xrange(len(x_db)) for j in xrange(len(x_db[i]))]
@@ -512,12 +510,12 @@ def load_db_cali_train():
     
     return x_db
 
-def proc_positive_list(limit = 100000):
-    count = 0
+def proc_complex_calib_positive_list(limit = 100000):
     annot_dir = etc.db_dir + "HollywoodHeads/Annotations/"
     img_dir = etc.db_dir + "HollywoodHeads/JPEGImages/"
-    data_db = [0 for _ in xrange(limit)]
-    if os._exists(etc.db_dir + 'data_db.pickle'): os.remove(etc.db_dir + 'data_db.pickle')
+    data_db = []
+    count = 0
+    if os._exists(etc.db_dir + 'data_db_complex.pickle'): os.remove(etc.db_dir + 'data_db_complex.pickle')
     for filename in os.listdir(annot_dir):
         if count < limit:
             if filename.endswith("xml"):
@@ -553,86 +551,152 @@ def proc_positive_list(limit = 100000):
                     left = int(float(cur_objects[z]['xmin']))
                     right = int(float(cur_objects[z]['xmax']))
                     upper = int(float(cur_objects[z]['ymin']))
-                    lower = int(float(cur_objects[z]['ymax']))
-                    head_box.append(tuple([left, upper, right, lower]))
-                data_db[count] = tuple([img_name, head_box])
-                print("Processing: ", count)
-                count+=1
-    data_db = [elem for elem in data_db if type(elem) != int]
-    with open(etc.db_dir + 'data_db.pickle', 'wb') as handle:
-        pickle.dump(data_db, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    print('Proccessed array dumped to file')
+                    lower = int(float(cur_objects[z]['ymax'])) 
+                    img = Image.open(img_dir+img_name)
+                    # ImageDraw.Draw(img).rectangle((left, upper, right, lower), outline = "red")
+                    # img.show()
+                    if right >= img.size[0]:
+                        right = img.size[0]-1
+                    if lower >= img.size[1]:
+                        lower = img.size[1]-1
 
-def load_positive_list():
-    with open(etc.db_dir + 'data_db.pickle', 'rb') as handle:
+                    for si,s in enumerate(etc.cali_scale):
+                        for xi,x in enumerate(etc.cali_off_x):
+                            for yi,y in enumerate(etc.cali_off_y):
+                                
+                                new_left = left - x*float(right-left)/s
+                                new_upper = upper - y*float(lower-upper)/s
+                                new_right = new_left+float(right-left)/s
+                                new_lower = new_upper+float(lower-upper)/s
+                                
+                                new_left = int(new_left)
+                                new_upper = int(new_upper)
+                                new_right = int(new_right)
+                                new_lower = int(new_lower)
+
+
+                                if new_left < 0 or new_upper < 0 or new_right >= img.size[0] or new_lower >= img.size[1]:
+                                    continue
+
+                                calib_idx = si*len(etc.cali_off_x)*len(etc.cali_off_y)+xi*len(etc.cali_off_y)+yi
+
+                                data_db.append([img_name, new_left, new_upper, new_right, new_lower, calib_idx])
+                            
+                count+=1
+                print('Pre-processing training db: ', count-1, ' out of ', limit)
+                
+    with open(etc.db_dir + 'data_db_complex.pickle', 'wb') as handle:
+        pickle.dump(data_db, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    print('Processed array dumped to file with length: ', str(len(data_db)))
+
+def dump_calib_positive_list(limit = 100000):
+    annot_dir = etc.db_dir + "HollywoodHeads/Annotations/"
+    img_dir = etc.db_dir + "HollywoodHeads/JPEGImages/"
+    dest_dir = etc.db_dir + "heads_calib/"
+    data_db = []
+    count = 0
+    [os.remove(dest_dir + elem) for elem in os.listdir(dest_dir)]
+    for filename in os.listdir(annot_dir):
+        if count < limit:
+            if filename.endswith("xml"):
+                cur_file = os.path.join(annot_dir, filename)
+                cur_size = []
+                cur_objects = []
+                image = None
+                root = ET.parse(cur_file).getroot()
+                img_name = root.find('filename').text
+                size = root.find("size")
+                for elem in size.iter():
+                    cur_size.append(elem.text)
+                del cur_size[0]
+                if not cur_size[2] == '3':
+                    #print('Invalid image, skipping')
+                    continue   
+                for obj in root.findall('object'):
+                    bbox = obj.find('bndbox')
+                    if bbox is None:
+                        continue
+                    cur = {}
+                    for element in bbox.iter():
+                        if element.tag == "bndbox":
+                            pass
+                        else:
+                            cur[element.tag] = element.text
+                    cur_objects.append(cur)
+                head_box = []
+                if len(cur_objects)==0:
+                    print('Skipping image, no boundary box or error in format')
+                    continue
+                for z in range(len(cur_objects)):
+                    left = int(float(cur_objects[z]['xmin']))
+                    right = int(float(cur_objects[z]['xmax']))
+                    upper = int(float(cur_objects[z]['ymin']))
+                    lower = int(float(cur_objects[z]['ymax'])) 
+                    img = Image.open(img_dir+img_name)
+                    # ImageDraw.Draw(img).rectangle((left, upper, right, lower), outline = "red")
+                    # img.show()
+                    if right >= img.size[0]:
+                        right = img.size[0]-1
+                    if lower >= img.size[1]:
+                        lower = img.size[1]-1
+
+                    for si,s in enumerate(etc.cali_scale):
+                        for xi,x in enumerate(etc.cali_off_x):
+                            for yi,y in enumerate(etc.cali_off_y):
+                                
+                                new_left = left - x*float(right-left)/s
+                                new_upper = upper - y*float(lower-upper)/s
+                                new_right = new_left+float(right-left)/s
+                                new_lower = new_upper+float(lower-upper)/s
+                                
+                                new_left = int(new_left)
+                                new_upper = int(new_upper)
+                                new_right = int(new_right)
+                                new_lower = int(new_lower)
+
+
+                                if new_left < 0 or new_upper < 0 or new_right >= img.size[0] or new_lower >= img.size[1]:
+                                    continue
+
+                                cropped_img = img.crop((new_left, new_upper, new_right, new_lower))
+                                calib_idx = si*len(etc.cali_off_x)*len(etc.cali_off_y)+xi*len(etc.cali_off_y)+yi
+
+                                cropped_img.save(dest_dir + str(calib_idx) + "||" + img_name)
+                           
+                count+=1
+                print('Pre-processing training db: ', count-1, ' out of ', limit)
+
+
+def load_complex_positive_list():
+    with open(etc.db_dir + 'data_db_complex.pickle', 'rb') as handle:
         return pickle.load(handle)
 
-def generate_sample(db_in, batch):
-    cur_time = time.time()
+def generate_complex_sample(db_in, batch):
     img_dir = etc.db_dir + "HollywoodHeads/JPEGImages/"
-    db_out = [0 for _ in range(batch)]
-    for i in range(batch): #range(batch):
-        #print(i, time.time()-cur_time)
-        cur_time = time.time()
-        cur_img = random.choice(db_in)
-        img_name = cur_img[0]
-        head = random.choice(cur_img[1])
+    db_id = random.sample(xrange(len(db_in)),batch)
+    db_out = []
+    for cur_id in db_id:
+        (img_name, new_left, new_upper, new_right, new_lower, calib_idx) = db_in[cur_id]
         img = Image.open(img_dir+img_name)
-        left = head[0]
-        right = head[2]
-        upper = head[1]
-        lower = head[3]
-        if right >= img.size[0]:
-            right = img.size[0]-1
-        if lower >= img.size[1]:
-            lower = img.size[1]-1
-
-        si = random.randint(0, len(etc.cali_scale)-1)
-        s = etc.cali_scale[si]
-        xi = random.randint(0, len(etc.cali_off_x)-1)
-        x = etc.cali_off_x[xi]
-        yi = random.randint(0, len(etc.cali_off_y)-1)
-        y = etc.cali_off_y[yi]
-        new_left = left - x*float(right-left)/s
-        new_upper = upper - y*float(lower-upper)/s
-        new_right = new_left+float(right-left)/s
-        new_lower = new_upper+float(lower-upper)/s
-        
-        new_left = int(new_left)
-        new_upper = int(new_upper)
-        new_right = int(new_right)
-        new_lower = int(new_lower)
-
-        
-        if new_left < 0 or new_upper < 0 or new_right >= img.size[0] or new_lower >= img.size[1]:
-            continue
-
-        chk = time.time()
-        #cropped_img = Image.fromarray(np.array(img)[upper:lower, left:right])
         cropped_img = img.crop((new_left, new_upper, new_right, new_lower))
-        #print(time.time()-chk)
-        calib_idx = si*len(etc.cali_off_x)*len(etc.cali_off_y)+xi*len(etc.cali_off_y)+yi
-        db_out[i] = [cropped_img,calib_idx]
-    db_out = [elem for elem in db_out if type(elem) != int]
+        db_out.append([cropped_img,calib_idx])
     return db_out
 
-def PIL2array(img):
-    return numpy.array(img.getdata(),
-                    numpy.uint8).reshape(img.size[1], img.size[0], 3)
-
-def array2PIL(arr, size):
-    mode = 'RGBA'
-    arr = arr.reshape(arr.shape[0]*arr.shape[1], arr.shape[2])
-    if len(arr[0]) == 3:
-        arr = numpy.c_[arr, 255*numpy.ones((len(arr),1), numpy.uint8)]
-    return Image.frombuffer(mode, size, arr.tostring(), 'raw', mode, 0, 1)
-
-
+def generate_simple_sample(db_in, batch):
+    dest_dir = etc.db_dir + "heads_calib/"
+    db_id = random.sample(xrange(len(db_in)),batch)
+    db_out = []
+    a_t = time.time()
+    for cur in db_id:
+        img_name = db_in[cur]
+        calib = int(img_name[:img_name.find('||')])
+        a_t = time.time()
+        db_out.append([Image.open(dest_dir+img_name), calib])
+    return db_out
+    
 def main(argv):
     #dump_neg_imgs()
-    proc_positive_list(limit = 200000)
-    db = load_positive_list()
-    print('Loading databases')
+    dump_calib_positive_list(limit = 50000)
 
 if __name__ == "__main__":
     main(sys.argv)

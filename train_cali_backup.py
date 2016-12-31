@@ -9,13 +9,13 @@ import Image
 import ImageDraw
 from compiler.ast import flatten
 import sys
-import os
+
 import etc
 import load_db
 
 
 
-data_db = os.listdir(etc.db_dir + "heads_calib/")
+train_db = load_db.full_load_db_cali_head_train()
 
 sess = tf.InteractiveSession()
 
@@ -104,17 +104,17 @@ h_fc2_48 = tf.nn.softmax(tf.matmul(h_fc1_48, W_fc2_48_cali) + b_fc2_48_cali)
 
 loss_12 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_12 + 1e-9),1))
 train_step_12 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_12)
-#train_step_12 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_12)
+# train_step_12 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_12)
 accuracy_12 = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(h_fc2_12,1), tf.argmax(y_target,1)), "float"))
 
 loss_24 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_24 + 1e-9),1))
-#train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)
-train_step_24 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_24)
+train_step_24 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_24)
+# train_step_24 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_24)
 accuracy_24 = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(h_fc2_24,1), tf.argmax(y_target,1)), "float"))
 
 loss_48 = tf.reduce_mean(-tf.reduce_sum(y_target * tf.log(h_fc2_48 + 1e-9),1))
-#train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)
-train_step_48 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_48)
+train_step_48 = tf.train.GradientDescentOptimizer(etc.lr).minimize(loss_48)
+#train_step_48 = tf.train.AdamOptimizer(learning_rate=etc.lr, epsilon=etc.epsilon).minimize(loss_48)
 accuracy_48 = tf.reduce_mean(tf.cast(tf.equal(tf.argmax(h_fc2_48,1), tf.argmax(y_target,1)), "float"))
 
 sess.run(tf.initialize_all_variables())
@@ -149,38 +149,38 @@ for cascade_lv in xrange(0, etc.cascade_level):
         average_loss = 0
 
         for b_iter in xrange(etc.batch_iter):
-            db_chk = load_db.generate_simple_sample(data_db, etc.mini_batch)
+            
+            db_id = random.sample(xrange(len(train_db)),etc.mini_batch)
             if cascade_lv == 0:
-                lb[:,:] = 0.0     
-                for id_ in xrange(etc.mini_batch):
-                    patch_img = db_chk[id_][0]
-                    patch = etc.img2array(patch_img,etc.img_size_12)
-                    calib_idx = db_chk[id_][1]
+                lb[:,:] = 0.0
+                for id_,did in enumerate(db_id):
+                    st_time = time.time()
+                    patch_img = train_db[did][0]
+                    patch = etc.img2array(patch_img, etc.img_size_12)
+                    calib_idx = train_db[did][1]
 
                     db_12[id_,:] = patch
                     lb[id_,calib_idx] = 1.0
+                    print(time.time() - st_time)
 
                 zipped = zip(db_12, lb)
                 np.random.shuffle(zipped)
                 X_12 = [elem[0] for elem in zipped]
                 Y = [elem[1] for elem in zipped]
                 X_12 = np.asarray(X_12)
-                Y = np.reshape(np.asarray(Y),(np.shape(X_12)[0],etc.cali_patt_num))
-                #print(str(time.time() - start_time))                
+                Y = np.reshape(np.asarray(Y),(np.shape(X_12)[0],etc.cali_patt_num))                
                 average_loss += loss_12.eval(feed_dict = {x_12:X_12, y_target:Y})
-                #print(str(time.time() - start_time))
                 train_step_12.run(feed_dict = {x_12:X_12, y_target:Y})
-                #print(str(time.time() - start_time))
-
+                
             elif cascade_lv == 1:
                 lb[:,:] = 0.0
-                for id_,item in enumerate(db_chk):
-                    patch = etc.img2array(item[0],etc.img_size_24)
-                    calib_idx = item[1]
+                for id_,did in enumerate(db_id):
+                    patch = etc.img2array(train_db[did][0],etc.img_size_24)
+                    calib_idx = train_db[did][1]
 
                     db_24[id_,:] = patch
                     lb[id_,calib_idx] = 1.0
-
+                    
                 zipped = zip(db_24,lb)
                 np.random.shuffle(zipped)
                 X_24 = [elem[0] for elem in zipped]
@@ -192,9 +192,9 @@ for cascade_lv in xrange(0, etc.cascade_level):
                 train_step_24.run(feed_dict = {x_24:X_24, y_target:Y})
             elif cascade_lv == 2:
                 lb[:,:] = 0.0
-                for id_,item in enumerate(db_chk):
-                    patch = etc.img2array(item[0],etc.img_size_48)
-                    calib_idx = item[1]
+                for id_,did in enumerate(db_id):
+                    patch = etc.img2array(train_db[did][0],etc.img_size_48)
+                    calib_idx = train_db[did][1]
 
                     db_48[id_,:] = patch
                     lb[id_,calib_idx] = 1.0
@@ -210,21 +210,20 @@ for cascade_lv in xrange(0, etc.cascade_level):
                 train_step_48.run(feed_dict = {x_48:X_48, y_target:Y})
 
             #print(str(time.time() - start_time))
-            
             if b_iter > 0 and b_iter % etc.result_interval == 0: 
                 print "cas_lv: " +  str(cascade_lv) + " epoch: " + str(e) + " db_num: " + str(b_iter) + "/" + str(etc.batch_iter) + " avg_loss: " + str(average_loss / b_iter)
-
+                #sys.exit(0)
 
         epoch_finish = time.time()
         average_loss /= etc.batch_iter
         
-        db_chk = load_db.generate_simple_sample(data_db, etc.acc_bench_num)
+        db_id = random.sample(xrange(len(train_db)),etc.acc_bench_num)
 
         if cascade_lv == 0:
             acc_lb[:,:] = 0.0
-            for id_,item in enumerate(db_chk):
-                patch = etc.img2array(item[0],etc.img_size_12)
-                calib_idx = item[1]
+            for id_,did in enumerate(db_id):
+                patch = etc.img2array(train_db[did][0],etc.img_size_12)
+                calib_idx = train_db[did][1]
 
                 acc_db_12[id_,:] = patch
                 acc_lb[id_,calib_idx] = 1.0
@@ -237,9 +236,9 @@ for cascade_lv in xrange(0, etc.cascade_level):
                 fp_conf_mat.write("(" + str(output[n]) + ", " + str(Y[n,:]) + ")\n")
         elif cascade_lv == 1:
             acc_lb[:,:] = 0.0
-            for id_,item in enumerate(db_chk):
-                patch = etc.img2array(item[0],etc.img_size_24)
-                calib_idx = item[1]
+            for id_,did in enumerate(db_id):
+                patch = etc.img2array(train_db[did][0],etc.img_size_24)
+                calib_idx = train_db[did][1]
 
                 acc_db_24[id_,:] = patch
                 acc_lb[id_,calib_idx] = 1.0
@@ -253,9 +252,9 @@ for cascade_lv in xrange(0, etc.cascade_level):
                 fp_conf_mat.write("(" + str(output[n]) + ", " + str(Y[n,:]) + ")\n")
         else:
             acc_lb[:,:] = 0.0
-            for id_,item in enumerate(db_chk):
-                patch = etc.img2array(item[0],etc.img_size_48)
-                calib_idx = item[1]
+            for id_,did in enumerate(db_id):
+                patch = etc.img2array(train_db[did][0],etc.img_size_48)
+                calib_idx = train_db[did][1]
 
                 acc_db_48[id_,:] = patch
                 acc_lb[id_,calib_idx] = 1.0

@@ -31,10 +31,10 @@ dim_48 = img_size_48 * img_size_48 * input_channel
 #network parameters
 b_intial = 0.0
 w_stddev = 0.1
-lr = 5e-2
+lr = 0.1
 epsilon = 0.1
 epoch_num = [100,100,100]
-epoch_calib_num = [50, 50, 50]
+epoch_calib_num = [75, 50, 50]
 pos_batch = 50
 neg_batch = 50
 mini_batch = 100
@@ -66,7 +66,6 @@ cali_patt_num = len(cali_scale) * len(cali_off_x) * len(cali_off_y)
 cali_thr = 0.5
 
 def img2array(img,dim):
-    # print(np.shape(img), img.size)
     if dim == img_size_12:    
         if img.size[0] != img_size_12 or img.size[1] != img_size_12:
             img = img.resize((img_size_12,img_size_12))
