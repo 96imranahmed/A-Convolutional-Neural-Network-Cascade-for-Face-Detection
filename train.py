@@ -15,7 +15,7 @@ import load_db
 
 
 
-train_db = load_db.load_db_head_train()
+train_db = load_db.full_load_db_head_train()
 
 pos_db = train_db[0]
 neg_db = train_db[1]
@@ -341,7 +341,6 @@ for cascade_lv in xrange(0,etc.cascade_level):
         
         train_finish = time.time()
         print train_finish - train_start, "secs for training"
-        fp_loss.close()
         
         saver = tf.train.Saver()
         if cascade_lv == 0:

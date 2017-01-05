@@ -4,7 +4,7 @@ from PIL import Image
 from PIL import ImageDraw
 import math
 import time
-import random
+from random import randint
 import os
 import shutil
 from skimage.transform import pyramid_gaussian
@@ -158,7 +158,7 @@ def full_load_db_head_train():
             neg_img[neg_count] = img
             neg_db_line = np.zeros((etc.neg_per_img,etc.dim_12), np.float32)
             for neg_iter in xrange(etc.neg_per_img):
-                                      
+                                        
                 rad_rand = randint(0,min(img.size[0],img.size[1])-1)
                 while(rad_rand <= etc.face_minimum):
                     rad_rand = randint(0,min(img.size[0],img.size[1])-1)     
@@ -168,7 +168,7 @@ def full_load_db_head_train():
 
                 neg_cropped_img = img.crop((x_rand, y_rand, x_rand + rad_rand, y_rand + rad_rand))
                 neg_cropped_arr = etc.img2array(neg_cropped_img,etc.img_size_12)
-                  
+                    
                 neg_db_line[neg_iter,:] = neg_cropped_arr
                 
             neg_db[neg_count] = neg_db_line
@@ -349,7 +349,7 @@ def load_db_detect_train():
    
     print "Loading training db..."
 
-    annot_dir = etc.db_dir + "AFLW/aflw/data/"
+    annot_dir = etc.db_dir + "/aflw/data/"
     annot_fp = open(annot_dir + "annot", "r")
     raw_data = annot_fp.readlines()
 
@@ -400,38 +400,44 @@ def load_db_detect_train():
     pos_db = [elem for elem in pos_db if type(elem) != int]    
     pos_db = np.vstack(pos_db) 
 
-    #neg image cropping
-    nid = 0
-    neg_file_list = os.listdir(etc.neg_dir)
-    neg_db = [0 for n in xrange(len(neg_file_list))]
-    neg_img = [0 for n in xrange(len(neg_file_list))]
-    for file in neg_file_list:
-        img = Image.open(etc.neg_dir + file)
-        if len(np.shape(np.asarray(img))) != 3:
-            continue
-        neg_img[nid] = img
-        print nid+1, "/" , len(neg_file_list), "th neg image cropping..."
-        neg_db_line = np.zeros((etc.neg_per_img,etc.dim_12), np.float32)
-        for neg_iter in xrange(etc.neg_per_img):
-                     
-            rad_rand = randint(0,min(img.size[0],img.size[1])-1)
-            while(rad_rand <= etc.face_minimum):
+    print('Loading negatives....')
+    neg_no_person_dir = etc.db_dir + '/neg/'
+    neg_count = 0
+    cur_neg_limit = etc.db_neg_data_limit
+    neg_db = [0 for n in xrange(cur_neg_limit)]
+    neg_img = [0 for n in xrange(cur_neg_limit)]
+    limit = True
+    cur_i = 0
+    for filename in os.listdir(neg_no_person_dir):
+        try:
+            if neg_count+1>cur_neg_limit:
+                break
+            img = Image.open(neg_no_person_dir+filename) 
+            if len(np.shape(np.asarray(img))) != 3:
+                continue
+            neg_img[neg_count] = img
+            neg_db_line = np.zeros((etc.neg_per_img,etc.dim_12), np.float32)
+            for neg_iter in xrange(etc.neg_per_img):
+                                      
                 rad_rand = randint(0,min(img.size[0],img.size[1])-1)
-            
-            x_rand = randint(0, img.size[0] - rad_rand - 1)
-            y_rand = randint(0, img.size[1] - rad_rand - 1)
-            
-            neg_cropped_img = img.crop((x_rand, y_rand, x_rand + rad_rand, y_rand + rad_rand))
-            neg_cropped_arr = etc.img2array(neg_cropped_img,etc.img_size_12)
-            
-            #for debugging
-            #neg_cropped_img.save(etc.neg_dir + str(f_num) + "_" + str(r) + ".jpg")
-                   
-            neg_db_line[neg_iter,:] = neg_cropped_arr
-        
-        neg_db[nid] = neg_db_line
-        nid += 1
-   
+                while(rad_rand <= etc.face_minimum):
+                    rad_rand = randint(0,min(img.size[0],img.size[1])-1)     
+
+                x_rand = randint(0, img.size[0] - rad_rand - 1)
+                y_rand = randint(0, img.size[1] - rad_rand - 1)
+
+                neg_cropped_img = img.crop((x_rand, y_rand, x_rand + rad_rand, y_rand + rad_rand))
+                neg_cropped_arr = etc.img2array(neg_cropped_img,etc.img_size_12)
+                  
+                neg_db_line[neg_iter,:] = neg_cropped_arr
+                
+            neg_db[neg_count] = neg_db_line
+            neg_count+=1
+            print('Processing negatives: ', neg_count, ' out of ', cur_neg_limit)
+        except:
+            print('Error - skipping!', sys.exc_info()[0])
+            neg_count+=1
+
     neg_db = [elem for elem in neg_db if type(elem) != int]
     neg_db = np.vstack(neg_db)
     neg_img = [elem for elem in neg_img if type(elem) != int]
@@ -446,7 +452,7 @@ def load_db_cali_train():
    
     print "Loading training db..."
 
-    annot_dir = etc.db_dir + "AFLW/aflw/data/"
+    annot_dir = etc.db_dir + "/aflw/data/"
     annot_fp = open(annot_dir + "annot", "r")
     raw_data = annot_fp.readlines()
     

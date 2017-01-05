@@ -7,8 +7,8 @@ from skimage.util.shape import view_as_windows
 from skimage.transform import pyramid_gaussian
 
 #data_specifics
-db_data_limit = 200
-db_neg_data_limit = 10000
+db_data_limit = 30000
+db_neg_data_limit = 6000
 
 #dir
 raw_dir = "/home/imran/Desktop/CascadeCNN/"
@@ -31,10 +31,10 @@ dim_48 = img_size_48 * img_size_48 * input_channel
 #network parameters
 b_intial = 0.0
 w_stddev = 0.1
-lr = 0.1
+lr = 0.01
 epsilon = 0.1
 epoch_num = [100,100,100]
-epoch_calib_num = [75, 50, 50]
+epoch_calib_num = [300, 100, 50]
 pos_batch = 50
 neg_batch = 50
 mini_batch = 100
