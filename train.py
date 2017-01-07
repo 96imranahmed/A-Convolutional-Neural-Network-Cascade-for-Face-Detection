@@ -401,7 +401,7 @@ for cascade_lv in xrange(0,etc.cascade_level):
                 if box[6] != scale_cur or id_ == len(result_box)-1:
                     scale_box.sort(key=lambda x :x[4])
                     scale_box.reverse()
-                    supp_box_id = etc.NMS(scale_box)
+                    supp_box_id = etc.NMS_fast(scale_box)
                     final_box += [scale_box[i] for i in supp_box_id]
                     scale_cur += 1
                     scale_box = [box]
@@ -458,7 +458,7 @@ for cascade_lv in xrange(0,etc.cascade_level):
                         if box[6] != scale_cur or id_ == len(result_box)-1:
                             scale_box.sort(key=lambda x :x[4])
                             scale_box.reverse()
-                            supp_box_id = etc.NMS(scale_box)
+                            supp_box_id = etc.NMS_fast(scale_box)
                             final_box += [scale_box[i] for i in supp_box_id]
                             scale_cur += 1
                             scale_box = [box]
